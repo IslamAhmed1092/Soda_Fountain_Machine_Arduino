@@ -2,7 +2,7 @@
 #include <Keypad.h>
 
 const int buzzer = 13;
-const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 
@@ -16,10 +16,13 @@ char keys[ROW_NUM][COLUMN_NUM] = {
   {'*','0','#'}
 };
 
-byte pin_rows[ROW_NUM] = {10, 9, 8, 7};
+byte pin_rows[ROW_NUM] = {8, A3, A4, A5};
 byte pin_column[COLUMN_NUM] = {A0, A1, A2};
 
 Keypad keypad = Keypad( makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_NUM );
+
+
+const int trig = 11, echo = 12;
 
 
 typedef enum state{
@@ -40,6 +43,8 @@ void getPassword() {
 
 void setup() {
   pinMode(buzzer, OUTPUT);
+  pinMode(trig, OUTPUT);
+  pinMode(echo, INPUT);
   Serial.begin(9600);
   lcd.begin(16, 2);
   getPassword();
@@ -65,6 +70,16 @@ void wrong_password_alert() {
 
 void loop() {
 
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  long t = pulseIn(echo, HIGH, 28500);
+  long distance = t/57;
+  
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+  
   if(current_state == INPUT_PASSWORD) {
     char key = keypad.getKey();
 
