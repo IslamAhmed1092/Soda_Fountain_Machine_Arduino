@@ -2,7 +2,7 @@
 #include <Keypad.h>
 
 const int buzzer = 13;
-const int motor_pin = 1;
+const int motor_pin = 10;
 const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 enum operationState
@@ -91,8 +91,8 @@ char keys[ROW_NUM][COLUMN_NUM] = {
     {'7', '8', '9'},
     {'*', '0', '#'}};
 
-byte pin_rows[ROW_NUM] = {8, A3, A4, A5};
-byte pin_column[COLUMN_NUM] = {A0, A1, A2};
+byte pin_rows[ROW_NUM] = {8, A0, A1, A2};
+byte pin_column[COLUMN_NUM] = {A3, A4, A5};
 
 Keypad keypad = Keypad(makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_NUM);
 Motor motor = Motor(motor_pin);
