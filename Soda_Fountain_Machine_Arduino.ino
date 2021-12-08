@@ -2,9 +2,10 @@
 #include <Keypad.h>
 
 const int buzzer = 13;
+const int motor_pin = 1;
 const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
-enum OPSTATE
+enum operationState
 {
   OFF,
   ON
@@ -20,35 +21,34 @@ enum ProgressState
 class Motor
 {
 private:
-  OPSTATE state;
   int pin;
-
+  operationState state;
 public:
   Motor(int pin);
   void turnOn()
   {
-    this->state = ON;
+    this->state = operationState::ON;
+    digitalWrite(this->pin, LOW);
   }
   void turnOff()
   {
-    this->state = OFF;
-  }
-  OPSTATE getState()
-  {
-    return this->state;
+    this->state = operationState::OFF;
+    digitalWrite(this->pin, HIGH);
   }
   ~Motor();
 };
 
+
 Motor::Motor(int pin)
 {
-  this->state = false;
+  this->state = operationState::OFF;
   this->pin = pin;
 }
 
 Motor::~Motor()
 {
 }
+
 
 class Ultrasonic
 {
@@ -79,10 +79,6 @@ int Ultrasonic::getDistance()
   digitalWrite(trig, LOW);
   float t = pulseIn(echo, HIGH, 28500);
   float distance = t / 57;
-
-  Serial.print("Distance: ");
-  Serial.print(distance);
-  Serial.println(" cm");
   return distance;
 }
 
@@ -99,6 +95,7 @@ byte pin_rows[ROW_NUM] = {8, A3, A4, A5};
 byte pin_column[COLUMN_NUM] = {A0, A1, A2};
 
 Keypad keypad = Keypad(makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_NUM);
+Motor motor = Motor(motor_pin);
 
 const int trig = 12, echo = 11;
 
@@ -106,22 +103,18 @@ ProgressState current_state = INPUT_PASSWORD;
 const String real_password = "1234";
 String input_password = "";
 
-void getPassword()
-{
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Password:");
-  lcd.setCursor(0, 1);
-}
+bool first_time = true;
+uint8_t cup_size;
+
 
 void setup()
 {
   pinMode(buzzer, OUTPUT);
   pinMode(trig, OUTPUT);
   pinMode(echo, INPUT);
-  Serial.begin(9600);
+  pinMode(motor_pin, OUTPUT);
+  digitalWrite(motor_pin, HIGH);
   lcd.begin(16, 2);
-  getPassword();
 }
 
 void clear_char(uint8_t input_length)
@@ -131,7 +124,7 @@ void clear_char(uint8_t input_length)
   lcd.setCursor(input_length - 1, 1);
 }
 
-void wrong_password_alert()
+void alert()
 {
   for (uint8_t i = 0; i < 3; i++)
   {
@@ -145,44 +138,14 @@ void wrong_password_alert()
 }
 void handlePassword()
 {
-  char key = keypad.getKey();
-
-  if (key)
-  {
-    switch (key)
-    {
-    case '*':
-      if (input_password.length() > 0)
-      {
-        clear_char(input_password.length());
-        input_password = input_password.substring(0, input_password.length() - 1);
-      }
-      break;
-    case '#':
-      if (input_password == real_password)
-      {
-        Serial.println("Correct Password!");
-      }
-      else
-      {
-        Serial.println("Wrong Password!");
-        wrong_password_alert();
-      }
-      break;
-    default:
-      if (input_password.length() < 16)
-      {
-        input_password += key;
-        lcd.print(key);
-      }
-      break;
-    }
-    Serial.print("current input password: ");
-    Serial.println(input_password);
+  if(first_time) {  
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Password:");
+    lcd.setCursor(0, 1);
+    first_time = false;
   }
-}
-void handleMode()
-{
+
   char key = keypad.getKey();
 
   if (key)
@@ -197,16 +160,15 @@ void handleMode()
       }
       break;
     case '#':
-
       if (input_password == real_password)
       {
+        input_password = "";
         current_state = ProgressState::CHOOSE_MODE;
-        Serial.println("Correct Password!");
+        first_time = true;
       }
       else
       {
-        Serial.println("Wrong Password!");
-        wrong_password_alert();
+        alert();
       }
       break;
     default:
@@ -217,15 +179,44 @@ void handleMode()
       }
       break;
     }
-    Serial.print("current input password: ");
-    Serial.println(input_password);
   }
 }
 
 void handleMode()
 {
-  // handle the mood
+  if(first_time) {  
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("1:Medium 2:Large");
+    lcd.setCursor(0, 1);
+    first_time = false;
+  }
+
+  char key = keypad.getKey();
+
+  if (key)
+  {
+    switch (key)
+    {
+    case '1':
+      cup_size = 1;
+      current_state = ProgressState::POUR_MODE;
+      first_time = true;
+      break;
+    case '2':
+      cup_size = 2;
+      current_state = ProgressState::POUR_MODE;
+      first_time = true;
+      break;
+    default:
+      alert();
+      break;
+    }
+  }
 }
+
+
+long current_time = 0, motor_time = 0;
 
 void pourCocaCola()
 {
@@ -239,6 +230,31 @@ void pourCocaCola()
   
   */
   // in finished input password
+  if(first_time) {  
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Pouring drink ");
+    lcd.setCursor(0, 1);
+    
+    if(cup_size == 1) 
+      lcd.print("Medium");
+    else
+      lcd.print("Large");
+    
+    first_time = false;
+    
+    motor.turnOn();
+    motor_time = millis();
+  }
+  
+  current_time = millis();
+  lcd.setCursor(7, 1);
+  lcd.print(((current_time - motor_time) / 1000) + 1);
+  if((cup_size == 1 && current_time - motor_time >= 5000) || (cup_size == 2 && current_time - motor_time >= 10000)) {
+    motor.turnOff();
+    current_state = ProgressState::INPUT_PASSWORD;
+    first_time = true;
+  }
 }
 void loop()
 {
@@ -256,7 +272,6 @@ void loop()
   case ProgressState::POUR_MODE:
     pourCocaCola();
     break;
-
   default:
     break;
   }
