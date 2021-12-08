@@ -1,10 +1,7 @@
 #include <LiquidCrystal.h>
 #include <Keypad.h>
-
-const int buzzer = 13;
-const int motor_pin = 10;
-const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+float RULERHEIGHT =21;
+bool debugCode=true;
 enum operationState
 {
   OFF,
@@ -58,7 +55,8 @@ private:
 public:
   Ultrasonic(int trigPin, int echoPin);
   ~Ultrasonic();
-  int getDistance();
+  float getDistance();
+  float getHeight();
 };
 
 Ultrasonic::Ultrasonic(int trigPin, int echoPin)
@@ -71,7 +69,7 @@ Ultrasonic::~Ultrasonic()
 {
 }
 
-int Ultrasonic::getDistance()
+float Ultrasonic::getDistance()
 {
 
   digitalWrite(trig, HIGH);
@@ -82,6 +80,30 @@ int Ultrasonic::getDistance()
   return distance;
 }
 
+
+
+float Ultrasonic::getHeight()
+{
+
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  float t = pulseIn(echo, HIGH, 28500);
+  float distance = t / 57;
+  return RULERHEIGHT-distance;
+}
+
+// Global Variables section
+
+// PINS Mapping
+const int trig = 12, echo = 11;
+const int buzzer = 13;
+const int motor_pin = 10;
+const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+
+// 
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+Ultrasonic ultrasonic(trig,echo);
 const int ROW_NUM = 4;
 const int COLUMN_NUM = 3;
 
@@ -97,7 +119,6 @@ byte pin_column[COLUMN_NUM] = {A3, A4, A5};
 Keypad keypad = Keypad(makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_NUM);
 Motor motor = Motor(motor_pin);
 
-const int trig = 12, echo = 11;
 
 ProgressState current_state = INPUT_PASSWORD;
 const String real_password = "1234";
@@ -109,6 +130,10 @@ uint8_t cup_size;
 
 void setup()
 {
+  if(debugCode){
+
+    Serial.begin(9600);
+  }
   pinMode(buzzer, OUTPUT);
   pinMode(trig, OUTPUT);
   pinMode(echo, INPUT);
@@ -217,7 +242,7 @@ void handleMode()
 
 
 long current_time = 0, motor_time = 0;
-
+float first_height;
 void pourCocaCola()
 {
   // pour the coca
@@ -245,6 +270,7 @@ void pourCocaCola()
     
     motor.turnOn();
     motor_time = millis();
+    first_height = ultrasonic.getHeight();
   }
   
   current_time = millis();
@@ -255,10 +281,17 @@ void pourCocaCola()
     current_state = ProgressState::INPUT_PASSWORD;
     first_time = true;
   }
+ 
 }
 void loop()
 {
+ if(debugCode){
+    float distance = ultrasonic.getDistance();
 
+    Serial.print("sonic distance is ");
+    Serial.println(distance);
+
+  }
   switch (current_state)
   {
   case ProgressState::INPUT_PASSWORD:
